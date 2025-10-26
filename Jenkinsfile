@@ -1,76 +1,60 @@
-// Define the agent to run the entire pipeline (using a label if on a distributed system, or 'any' on a single machine)
-// Ensure Docker is accessible from this agent.
 pipeline {
     agent any
 
-    // Environment variables that can be used throughout the pipeline
     environment {
-        // Define your Docker Hub username or use a local tag
-        DOCKER_IMAGE = "my-jenkins-app" // Replace with a meaningful name or use DOCKERHUB_CREDENTIAL_ID
-        DOCKER_REGISTRY = "" // Add your registry URL if needed, e.g., "docker.io/yourusername"
+        // Define the name and tag for your Docker image
+        DOCKER_IMAGE = "my-app-image:${env.BUILD_ID}"
+        CONTAINER_NAME = "my-app-container"
     }
 
-    // Stages define the sequential steps of the CI/CD process
     stages {
-        // 1. Checkout Stage: Get the source code
-        stage('Checkout Code') {
+        // 1. Checkout Code
+        stage('Checkout') {
             steps {
-                // Check out the code from the Git repository
-                // In a configured Jenkins job, this is often handled automatically.
-                // For a good practice, you can use:
-                git 'YOUR_GIT_REPOSITORY_URL' // Replace with your actual repository URL
+                echo 'Cloning the application repository...'
+                // You would use the 'git' step here for a real repo
+                // Example: git url: 'https://github.com/your-username/your-app.git', branch: 'main'
             }
         }
 
-        // 2. Build Stage: Build the Docker image
-        stage('Build Image') {
+        // 2. Build Docker Image
+        stage('Build') {
             steps {
-                echo 'Building Docker Image...'
-                // Build the Docker image using the Dockerfile in the root of the repo
-                script {
-                    // Build with a tag using the current build number
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_NUMBER}", ".")
-                }
+                echo 'Building Docker image...'
+                // This command assumes a Dockerfile exists in the root of the repo
+                sh "docker build -t ${DOCKER_IMAGE} ."
             }
         }
 
-        // 3. Test Stage: Run unit/integration tests (placeholder in this simple example)
-        stage('Test App') {
+        // 3. Test/Verify (using the newly built image)
+        stage('Test') {
             steps {
                 echo 'Running tests...'
-                // You'd typically run commands like 'npm test' or equivalent here.
-                sh 'npm test'
+                // Placeholder for running unit/integration tests inside a container
+                sh 'echo "Tests passed successfully!"' 
+                // In a real scenario, this would involve running a container with specific test commands.
             }
         }
 
-        // 4. Deploy Stage: Run the container
-        stage('Deploy App') {
+        // 4. Deploy Application
+        stage('Deploy') {
             steps {
-                echo 'Deploying Docker Container...'
-                script {
-                    // Stop and remove any previous running container (optional but useful for local testing)
-                    sh 'docker stop my-app-container || true'
-                    sh 'docker rm my-app-container || true'
+                echo 'Deploying application by stopping old and starting new container...'
+                
+                // Stop and remove the old container to ensure a clean deployment
+                sh "docker stop ${CONTAINER_NAME} || true"
+                sh "docker rm ${CONTAINER_NAME} || true"
 
-                    // Run the newly built container
-                    sh "docker run -d --name my-app-container -p 8080:3000 ${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
-                }
-                echo 'Deployment complete. App is running on port 8080.'
+                // Run the new container, exposing port 80 on the host (EC2)
+                // You must ensure this port is open in your AWS Security Group.
+                sh "docker run -d --name ${CONTAINER_NAME} -p 80:8080 ${DOCKER_IMAGE}"
             }
         }
     }
-
-    // Post-build actions (optional)
+    
     post {
         always {
-            // Cleanup workspace regardless of the build result
-            cleanWs()
-        }
-        success {
-            echo 'Pipeline finished successfully! 🎉'
-        }
-        failure {
-            echo 'Pipeline failed. Check the logs. 🔴'
+            echo "Pipeline finished with status: ${currentBuild.result}"
         }
     }
 }

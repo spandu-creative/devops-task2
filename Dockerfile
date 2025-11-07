@@ -1,21 +1,19 @@
-# Stage 1: Build Stage (using a base image)
+# Use official Node.js 18 image
 FROM node:18-alpine AS builder
 
+# Set working directory
 WORKDIR /app
 
-# Copy application files
-COPY app/package*.json ./
-# Install dependencies
+# Copy package files and install dependencies
+COPY package*.json ./
 RUN npm install
-COPY app/ ./
 
-# Stage 2: Final Run Stage (using a smaller runtime image)
-FROM node:18-alpine
+# Copy all files
+COPY . .
 
-WORKDIR /app
+# Build (if applicable)
+RUN npm run build || echo "No build step, skipping"
 
-# Copy only necessary files from the builder stage
-COPY --from=builder /app .
-
-EXPOSE 3000
-CMD [ "npm", "start" ]
+# Run the app
+EXPOSE 5000
+CMD ["npm", "start"]
